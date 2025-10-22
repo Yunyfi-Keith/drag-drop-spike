@@ -97,8 +97,14 @@ export class DesignWrapper extends LitElement {
 
     onDragOver(e) {
         e.preventDefault(); // Required to allow drop
-        this.isDragOver = true;
-        console.log(`dragover - ${this.name}`);
+
+        // e.target === this:
+        // this stops the event bubbling and therefore all parent divs also firing their dragover event
+        if (e.target === this) {
+            e.stopPropagation();
+            this.isDragOver = true;
+            console.log(`dragover - ${this.name}`);
+        }
     }
 
     onDragLeave(e) {
@@ -107,7 +113,11 @@ export class DesignWrapper extends LitElement {
 
     onDrop(e) {
         e.preventDefault();
-        this.isDragOver = false;
+
+        if (e.target === this) {
+            this.isDragOver = false;
+            console.log(`DROPPED - ${this.name}`);
+        }
     }
 }
 
