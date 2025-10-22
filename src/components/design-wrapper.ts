@@ -7,16 +7,45 @@ export class DesignWrapper extends LitElement {
     static styles =
         css`
             .design-wrapper {
+                position: relative;
+
                 padding: 10px;
-                background: #2c2c2c;
-                border: 2px solid #2c2c2c;
+                //background: #2c2c2c;
+                border: 2px dashed transparent;
                 transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
             }
 
+            .design-wrapper:hover {
+                border-color: #d3d3d3;
+            }
+
+            .design-wrapper::before {
+                content: '';
+                position: absolute;
+                top: 0px;
+                right: 0px;
+                width: 16px;
+                height: 16px;
+                background-image:
+                        radial-gradient(circle, #999 1.5px, transparent 1.5px),
+                        radial-gradient(circle, #999 1.5px, transparent 1.5px),
+                        radial-gradient(circle, #999 1.5px, transparent 1.5px),
+                        radial-gradient(circle, #999 1.5px, transparent 1.5px),
+                        radial-gradient(circle, #999 1.5px, transparent 1.5px),
+                        radial-gradient(circle, #999 1.5px, transparent 1.5px);
+                background-size: 6px 6px;
+                background-position: 0 0, 6px 0, 0 6px, 6px 6px, 0 12px, 6px 12px;
+                background-repeat: no-repeat;
+                cursor: grab;
+                opacity: 0.5;
+            }
+
+            .design-wrapper:hover::before {
+                opacity: 1;
+            }
+            
             slot {
-                display: block;
-                border: 2px solid #ff6600;
-                padding: 5px;
+         
             }
         `;
 
