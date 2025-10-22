@@ -1,5 +1,5 @@
 import {css, html, LitElement} from 'lit';
-import {customElement} from 'lit/decorators.js';
+import {customElement, property} from 'lit/decorators.js';
 
 @customElement('design-wrapper')
 export class DesignWrapper extends LitElement {
@@ -19,6 +19,10 @@ export class DesignWrapper extends LitElement {
                 border-color: #d3d3d3;
             }
 
+            .design-wrapper.drag-over {
+                background: #f0f0f0;
+            }
+            
             .design-wrapper::before {
                 content: '';
                 position: absolute;
@@ -26,13 +30,12 @@ export class DesignWrapper extends LitElement {
                 left: 0px;
                 width: 16px;
                 height: 16px;
-                background-image:
-                        radial-gradient(circle, #999 1.5px, transparent 1.5px),
-                        radial-gradient(circle, #999 1.5px, transparent 1.5px),
-                        radial-gradient(circle, #999 1.5px, transparent 1.5px),
-                        radial-gradient(circle, #999 1.5px, transparent 1.5px),
-                        radial-gradient(circle, #999 1.5px, transparent 1.5px),
-                        radial-gradient(circle, #999 1.5px, transparent 1.5px);
+                background-image: radial-gradient(circle, #999 1.5px, transparent 1.5px),
+                radial-gradient(circle, #999 1.5px, transparent 1.5px),
+                radial-gradient(circle, #999 1.5px, transparent 1.5px),
+                radial-gradient(circle, #999 1.5px, transparent 1.5px),
+                radial-gradient(circle, #999 1.5px, transparent 1.5px),
+                radial-gradient(circle, #999 1.5px, transparent 1.5px);
                 background-size: 6px 6px;
                 background-position: 0 0, 6px 0, 0 6px, 6px 6px, 0 12px, 6px 12px;
                 background-repeat: no-repeat;
@@ -43,23 +46,32 @@ export class DesignWrapper extends LitElement {
             .design-wrapper:hover::before {
                 opacity: 1;
             }
-            
+
             slot {
-         
+
             }
         `;
+
+    @property({attribute: true})
+    accessor name: string = null;
+
+    @property({type: Boolean})
+    accessor isDragOver: boolean = false;
 
     connectedCallback() {
         super.connectedCallback();
         this.setAttribute('draggable', 'true');
-        this.addEventListener('dragstart',  this.onDragStart, {passive: false});
-        this.addEventListener('drag',       this.onDrag);
-        this.addEventListener('dragend',    this.onDragEnd);
+        this.addEventListener('dragstart', this.onDragStart, {passive: false});
+        this.addEventListener('drag', this.onDrag);
+        this.addEventListener('dragend', this.onDragEnd);
+        this.addEventListener('dragover', this.onDragOver);
+        this.addEventListener('dragleave', this.onDragLeave);
+        this.addEventListener('drop', this.onDrop);
     }
 
     render() {
         return html`
-            <div class="design-wrapper">
+            <div class="design-wrapper ${this.isDragOver ? 'drag-over' : ''}">
                 <slot></slot>
             </div>
         `;
@@ -80,9 +92,23 @@ export class DesignWrapper extends LitElement {
 
     // always fires, even for unsuccessful drops
     onDragEnd(evt) {
-        console.log(evt.type, evt.target.localName, evt)
+        // console.log(evt.type, evt.target.localName, evt)
     }
 
+    onDragOver(e) {
+        e.preventDefault(); // Required to allow drop
+        this.isDragOver = true;
+        console.log(`dragover - ${this.name}`);
+    }
+
+    onDragLeave(e) {
+        this.isDragOver = false;
+    }
+
+    onDrop(e) {
+        e.preventDefault();
+        this.isDragOver = false;
+    }
 }
 
 
