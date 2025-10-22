@@ -1,0 +1,33 @@
+{
+  "compileOnSave": false,
+  "composite": true,
+  "declarationMap": true,
+  "compilerOptions": {
+    "baseUrl": ".",
+    "outDir": "./dist",
+    "declaration": true,
+    "sourceMap": true,
+    "composite": true,
+    "moduleResolution": "bundler",
+    "emitDecoratorMetadata": false,
+    "experimentalDecorators": true,
+    "useDefineForClassFields": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "lib": [
+      "ES2022",
+      "esnext.disposable",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
+  },
+  "exclude": [
+    "node_modules",
+    "tmp"
+  ],
+  "include": [
+    "src/**/*"
+  ]
+}
