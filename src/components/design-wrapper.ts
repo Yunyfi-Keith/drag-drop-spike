@@ -23,7 +23,7 @@ export class DesignWrapper extends LitElement {
                 content: '';
                 position: absolute;
                 top: 0px;
-                right: 0px;
+                left: 0px;
                 width: 16px;
                 height: 16px;
                 background-image:
@@ -49,13 +49,40 @@ export class DesignWrapper extends LitElement {
             }
         `;
 
+    connectedCallback() {
+        super.connectedCallback();
+        this.setAttribute('draggable', 'true');
+        this.addEventListener('dragstart',  this.onDragStart, {passive: false});
+        this.addEventListener('drag',       this.onDrag);
+        this.addEventListener('dragend',    this.onDragEnd);
+    }
+
     render() {
         return html`
-            <div draggable="true" class="design-wrapper">
+            <div class="design-wrapper">
                 <slot></slot>
             </div>
         `;
     }
+
+    onDragStart(evt) {
+        // evt.preventDefault()
+        evt.dataTransfer.effectAllowed = 'move'
+        evt.dataTransfer.setData('text/html', this.outerHTML)
+        console.log(evt.type, `${evt.target.localName} (${evt.target.textContent})`, evt)
+    }
+
+    // fires repeatedly while dragging
+    onDrag(evt) {
+        // evt.preventDefault()
+        console.log(evt.type, `${evt.target.localName} (${evt.target.textContent})`, evt)
+    }
+
+    // always fires, even for unsuccessful drops
+    onDragEnd(evt) {
+        console.log(evt.type, evt.target.localName, evt)
+    }
+
 }
 
 
