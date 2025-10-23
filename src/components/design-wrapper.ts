@@ -1,11 +1,13 @@
 import {css, html, LitElement} from 'lit';
 import {customElement, property} from 'lit/decorators.js';
 import {NativeDragDropController} from './controllers/nativeDragDropController';
+import {InteractDragDropController} from './controllers/interactDragDropController';
 
 @customElement('design-wrapper')
 export class DesignWrapper extends LitElement {
 
     private dragDropController = new NativeDragDropController(this);
+    // private dragDropController = new InteractDragDropController(this);
 
     static styles =
         css`
@@ -19,13 +21,13 @@ export class DesignWrapper extends LitElement {
             }
 
             .design-wrapper:hover {
-                border-color: #d3d3d3;
+                border-color: #a8a8a8;
             }
 
             .design-wrapper.drag-over {
-                background: #f0f0f0;
+                background: #a8a8a8;
             }
-            
+
             .design-wrapper::before {
                 content: '';
                 position: absolute;

@@ -55,12 +55,12 @@ export class NativeDragDropController implements ReactiveController {
         if (evt.target === element) {
             evt.dataTransfer.effectAllowed = 'move';
             evt.dataTransfer.setData('text/plain', this.host.id);
-            console.log(evt.type, `${(evt.target as HTMLElement).localName} (${(evt.target as HTMLElement).textContent})`, evt);
+            console.log(evt.type, `${(evt.target as HTMLElement).localName}`, evt);
         }
     };
 
     private onDrag = (evt: DragEvent) => {
-        console.log(evt.type, `${(evt.target as HTMLElement).localName} (${(evt.target as HTMLElement).textContent})`, evt);
+        console.log(evt.type, `${(evt.target as HTMLElement).localName}`, evt);
     };
 
     private onDragEnd = (evt: DragEvent) => {
@@ -71,7 +71,9 @@ export class NativeDragDropController implements ReactiveController {
         e.preventDefault(); // Required to allow drop
 
         const element = this.host as unknown as HTMLElement;
-        if (e.target === element) {
+        const target = e.target as HTMLElement;
+        let dragIsOnHostOrChild = element === target || element.contains(target);
+        if (dragIsOnHostOrChild) {
             e.stopPropagation();
             this._isDragOver = true;
             this.host.requestUpdate();
@@ -80,15 +82,31 @@ export class NativeDragDropController implements ReactiveController {
     };
 
     private onDragLeave = (e: DragEvent) => {
-        this._isDragOver = false;
-        this.host.requestUpdate();
+        const element = this.host as unknown as HTMLElement;
+        const target = e.target as HTMLElement;
+        const relatedTarget = e.relatedTarget as HTMLElement;
+
+        // Only set isDragOver to false if we're leaving the host element entirely
+        // (not just moving between child elements)
+        if (target === element && (!relatedTarget || !element.contains(relatedTarget))) {
+            this._isDragOver = false;
+            this.host.requestUpdate();
+        }
     };
 
     private onDrop = (e: DragEvent) => {
         e.preventDefault();
 
         const element = this.host as unknown as HTMLElement;
-        if (e.target === element) {
+        const target = e.target as HTMLElement;
+        let dropIsOnHostOrChild = element === target || element.contains(target);
+
+        console.log(`DROPPED BEFORE - ${this.host.name || 'unnamed'}`);
+
+        if (dropIsOnHostOrChild) {
+
+            e.stopPropagation()
+
             this._isDragOver = false;
             this.host.requestUpdate();
             console.log(`DROPPED - ${this.host.name || 'unnamed'}`);
@@ -97,6 +115,11 @@ export class NativeDragDropController implements ReactiveController {
             const draggedTask = document.getElementById(draggedItemId);
 
             if (draggedTask) {
+                // Check if the drop target is the dragged element itself or a descendant
+                if (draggedTask === element || draggedTask.contains(element)) {
+                    console.warn('Cannot drop a parent into its own child');
+                    return;
+                }
                 draggedTask.remove();
                 element.appendChild(draggedTask);
             }

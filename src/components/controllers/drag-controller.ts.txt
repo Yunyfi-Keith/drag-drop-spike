@@ -1,0 +1,279 @@
+import { ReactiveController, ReactiveControllerHost } from 'lit';
+import { $dragState, dragActions } from '../store/drag-store';
+
+enum DragPhase {
+  Idle,
+  ThresholdReached,
+  Dragging
+}
+
+export class DragController implements ReactiveController {
+  private host: ReactiveControllerHost & HTMLElement;
+  private componentId: string;
+  private unsubscribe?: () => void;
+
+  public isDragSource = false;
+  public isDropTarget = false;
+  public isValidDropTarget = false;
+
+  private dragPhase: DragPhase = DragPhase.Idle;
+  private dragStartPos = { x: 0, y: 0 };
+  private dragGhost: HTMLElement | null = null;
+  private animationFrame: number | null = null;
+
+  constructor(host: ReactiveControllerHost & HTMLElement, componentId: string) {
+    this.host = host;
+    this.componentId = componentId;
+    this.host.addController(this);
+  }
+
+  hostConnected() {
+    this.unsubscribe = $dragState.subscribe((state) => {
+      const newIsDragSource = state.isDragging && state.draggedComponentId === this.componentId;
+      const newIsDropTarget = state.isDragging && state.dropTargetId === this.componentId;
+      const newIsValidDropTarget = state.isValidDrop;
+
+      let shouldUpdate = false;
+
+      if (this.isDragSource !== newIsDragSource) {
+        this.isDragSource = newIsDragSource;
+        shouldUpdate = true;
+      }
+
+      if (this.isDropTarget !== newIsDropTarget) {
+        this.isDropTarget = newIsDropTarget;
+        shouldUpdate = true;
+      }
+
+      if (this.isValidDropTarget !== newIsValidDropTarget) {
+        this.isValidDropTarget = newIsValidDropTarget;
+        shouldUpdate = true;
+      }
+
+      if (shouldUpdate) {
+        this.host.requestUpdate();
+      }
+    });
+
+    this.host.addEventListener('pointerdown', this.handlePointerDown, { capture: true });
+  }
+
+  hostDisconnected() {
+    this.unsubscribe?.();
+    this.host.removeEventListener('pointerdown', this.handlePointerDown, { capture: true });
+
+    if (this.animationFrame) {
+      cancelAnimationFrame(this.animationFrame);
+    }
+
+    this.removeDragGhost();
+    dragActions.endDrag();
+    this.dragPhase = DragPhase.Idle;
+  }
+
+  private handlePointerDown = (event: PointerEvent) => {
+    if (event.button !== 0) return;
+
+    const target = event.target as HTMLElement;
+    const closestWrapper = target.closest('design-wrapper');
+
+    if (closestWrapper !== this.host || dragActions.isDragging()) return;
+
+    this.dragStartPos = { x: event.clientX, y: event.clientY };
+    this.dragPhase = DragPhase.ThresholdReached;
+
+    document.addEventListener('pointermove', this.handlePointerMove, { capture: true });
+    document.addEventListener('pointerup', this.handlePointerUp, { capture: true });
+
+    event.preventDefault();
+  };
+
+  private handlePointerMove = (event: PointerEvent) => {
+    if (this.animationFrame) {
+      cancelAnimationFrame(this.animationFrame);
+    }
+
+    this.animationFrame = requestAnimationFrame(() => {
+      this.processPointerMove(event);
+    });
+  };
+
+  private processPointerMove(event: PointerEvent) {
+    const deltaX = event.clientX - this.dragStartPos.x;
+    const deltaY = event.clientY - this.dragStartPos.y;
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+    if (this.dragPhase === DragPhase.ThresholdReached && distance > 5) {
+      this.startDrag(event);
+    }
+
+    if (this.dragPhase === DragPhase.Dragging) {
+      this.handleDragMove(event);
+    }
+  }
+
+  private handlePointerUp = (event: PointerEvent) => {
+    if (this.animationFrame) {
+      cancelAnimationFrame(this.animationFrame);
+      this.animationFrame = null;
+    }
+
+    document.removeEventListener('pointermove', this.handlePointerMove, { capture: true });
+    document.removeEventListener('pointerup', this.handlePointerUp, { capture: true });
+
+    if (this.dragPhase === DragPhase.Dragging) {
+      this.endDrag(event);
+    }
+
+    this.dragPhase = DragPhase.Idle;
+  };
+
+  private startDrag(event: PointerEvent) {
+    this.dragPhase = DragPhase.Dragging;
+
+    dragActions.startDrag(this.componentId);
+    this.host.setPointerCapture(event.pointerId);
+    document.body.classList.add('dragging');
+
+    this.createOptimizedDragGhost();
+    this.updateGhostPosition(event.clientX, event.clientY);
+  }
+
+  private handleDragMove(event: PointerEvent) {
+    this.updateGhostPosition(event.clientX, event.clientY);
+    this.detectDropTarget(event.clientX, event.clientY);
+  }
+
+  private detectDropTarget(clientX: number, clientY: number) {
+    if (this.dragPhase !== DragPhase.Dragging) return;
+
+    const elementUnder = document.elementFromPoint(clientX, clientY) as any;
+
+    // this.host.style.pointerEvents = '';
+    // if (this.dragGhost) this.dragGhost.style.pointerEvents = 'none';
+
+    const closestWrapper = elementUnder?.closest('design-wrapper') as HTMLElement | null;
+    const targetComponentId = closestWrapper ? (closestWrapper as any).targetConfiguration?.id : null;
+
+    const isSelf = targetComponentId === this.componentId;
+    const isChildOfHost = closestWrapper && closestWrapper !== this.host && this.host.contains(closestWrapper);
+
+    const validTargetId = !isSelf && (!isChildOfHost || closestWrapper === this.host) ? targetComponentId : null;
+
+    if (validTargetId) {
+      const isValid = this.isValidDropTarget1(validTargetId);
+      dragActions.setDropTarget(validTargetId, isValid);
+      this.updateGhostValidity(isValid);
+    } else {
+      dragActions.clearDropTarget();
+      this.updateGhostValidity(true);
+    }
+  }
+
+  private endDrag(event: PointerEvent) {
+    const dropTargetId = dragActions.getDropTargetId();
+    const isValidDrop = dragActions.isValidDrop();
+
+    if (dropTargetId && isValidDrop) {
+      this.handleDrop(dropTargetId);
+    }
+
+    this.removeDragGhost();
+    dragActions.endDrag();
+    document.body.classList.remove('dragging');
+
+    if (this.host.hasPointerCapture(event.pointerId)) {
+      this.host.releasePointerCapture(event.pointerId);
+    }
+
+    this.dragPhase = DragPhase.Idle;
+  }
+
+  private createOptimizedDragGhost() {
+    this.dragGhost = document.createElement('div');
+    this.dragGhost.className = 'drag-ghost';
+
+    const componentType = (this.host as any).componentType || 'Component';
+    this.dragGhost.innerHTML = `
+      <div class="ghost-content">
+        <span class="ghost-icon">📦</span>
+        <span class="ghost-text">${componentType}</span>
+      </div>
+    `;
+
+    Object.assign(this.dragGhost.style, {
+      position: 'fixed',
+      top: '0',
+      left: '0',
+      zIndex: '10000',
+      pointerEvents: 'none',
+      opacity: '0.8',
+      backgroundColor: 'rgba(91, 168, 255, 0.9)',
+      border: '2px solid #5ba8ff',
+      borderRadius: '4px',
+      padding: '8px 12px',
+      fontFamily: 'system-ui, sans-serif',
+      fontSize: '12px',
+      color: 'white',
+      whiteSpace: 'nowrap',
+      willChange: 'transform',
+    });
+
+    document.body.appendChild(this.dragGhost);
+  }
+
+  private updateGhostPosition(clientX: number, clientY: number) {
+    if (this.dragGhost) {
+      const offsetX = 15;
+      const offsetY = -10;
+      this.dragGhost.style.transform = `translate(${clientX + offsetX}px, ${clientY + offsetY}px)`;
+    }
+  }
+
+  private updateGhostValidity(isValid: boolean) {
+    if (this.dragGhost) {
+      requestAnimationFrame(() => {
+        if (this.dragGhost) {
+          this.dragGhost.style.backgroundColor = isValid
+            ? 'rgba(76, 175, 80, 0.9)'
+            : 'rgba(244, 67, 54, 0.9)';
+          this.dragGhost.style.borderColor = isValid ? '#4caf50' : '#f44336';
+        }
+      });
+    }
+  }
+
+  private removeDragGhost() {
+    if (this.dragGhost) {
+      document.body.removeChild(this.dragGhost);
+      this.dragGhost = null;
+    }
+  }
+
+  private isValidDropTarget1(targetComponentId: string): boolean {
+    if (targetComponentId === this.componentId) return false;
+
+    const targetElement = document.querySelector(`[data-component-id="${targetComponentId}"]`) as HTMLElement;
+    if (!targetElement) return false;
+
+    // Example rule: leaf components can't accept drops
+    if (targetElement.hasAttribute('data-leaf')) return false;
+
+    return true;
+  }
+
+  private handleDrop(targetComponentId: string) {
+    const dropEvent = new CustomEvent('component-reorder', {
+      detail: {
+        draggedId: this.componentId,
+        targetId: targetComponentId,
+        action: 'move'
+      },
+      bubbles: true
+    });
+
+    this.host.dispatchEvent(dropEvent);
+  }
+
+}
+

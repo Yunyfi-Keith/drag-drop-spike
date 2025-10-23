@@ -21,6 +21,7 @@
     "vite": "^7.1.5"
   },
   "dependencies": {
+    "interactjs": "^1.10.27",
     "lit": "^3.3.1",
     "uuid": "^13.0.0"
   }
