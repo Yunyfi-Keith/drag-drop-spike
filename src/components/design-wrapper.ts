@@ -1,9 +1,11 @@
 import {css, html, LitElement} from 'lit';
 import {customElement, property} from 'lit/decorators.js';
-import * as uuid from 'uuid';
+import {NativeDragDropController} from './controllers/nativeDragDropController';
 
 @customElement('design-wrapper')
 export class DesignWrapper extends LitElement {
+
+    private dragDropController = new NativeDragDropController(this);
 
     static styles =
         css`
@@ -56,93 +58,12 @@ export class DesignWrapper extends LitElement {
     @property({attribute: true})
     accessor name: string = null;
 
-    @property({type: Boolean})
-    accessor isDragOver: boolean = false;
-
-    connectedCallback() {
-        super.connectedCallback();
-        this.id = uuid.v4();
-        this.setAttribute('draggable', 'true');
-        this.addEventListener('dragstart', this.onDragStart, {passive: false});
-        this.addEventListener('drag', this.onDrag);
-        this.addEventListener('dragend', this.onDragEnd);
-        this.addEventListener('dragover', this.onDragOver);
-        this.addEventListener('dragleave', this.onDragLeave);
-        this.addEventListener('drop', this.onDrop);
-    }
-
     render() {
         return html`
-            <div class="design-wrapper ${this.isDragOver ? 'drag-over' : ''}">
+            <div class="design-wrapper ${this.dragDropController.isDragOver ? 'drag-over' : ''}">
                 <slot></slot>
             </div>
         `;
-    }
-
-    onDragStart(evt) {
-        // evt.preventDefault()
-        if (evt.target === this) {
-            evt.dataTransfer.effectAllowed = 'move'
-            evt.dataTransfer.setData('text/plain', this.id);
-            console.log(evt.type, `${evt.target.localName} (${evt.target.textContent})`, evt)
-        }
-    }
-
-    // fires repeatedly while dragging
-    onDrag(evt) {
-        // evt.preventDefault()
-        console.log(evt.type, `${evt.target.localName} (${evt.target.textContent})`, evt)
-    }
-
-    // always fires, even for unsuccessful drops
-    onDragEnd(evt) {
-        // console.log(evt.type, evt.target.localName, evt)
-    }
-
-    onDragOver(e) {
-        e.preventDefault(); // Required to allow drop
-
-        // e.target === this:
-        // this stops the event bubbling and therefore all parent divs also firing their dragover event
-        if (e.target === this) {
-            e.stopPropagation();
-            this.isDragOver = true;
-            console.log(`dragover - ${this.name}`);
-        }
-    }
-
-    onDragLeave(e) {
-        this.isDragOver = false;
-    }
-
-    onDrop(e) {
-        e.preventDefault();
-
-        if (e.target === this) {
-            this.isDragOver = false;
-            console.log(`DROPPED - ${this.name}`);
-
-            // document.querySelector(`[data-id="${e.dataTransfer.getData('text/plain')}"]`).remove();
-            // e.currentTarget.innerHTML = e.currentTarget.innerHTML + e.dataTransfer.getData('text/html');
-
-            const draggedItemId = e.dataTransfer.getData('text/plain');
-            const draggedTask = document.getElementById(draggedItemId);
-            draggedTask.remove();
-
-            this.appendChild(draggedTask);
-
-
-            // // Get the slot element from shadow DOM
-            // const slot = this.shadowRoot.querySelector('slot');
-            // const assignedElements = slot.assignedElements();
-            //
-            // // If there's a container element, append to it, otherwise append directly
-            // if (assignedElements.length > 0 && assignedElements[0].nodeType === Node.ELEMENT_NODE) {
-            //     assignedElements[0].appendChild(draggedTask);
-            // } else {
-            //     this.appendChild(draggedTask);
-            // }
-        }
     }
 }
 
