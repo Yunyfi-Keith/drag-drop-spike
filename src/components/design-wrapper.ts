@@ -1,5 +1,6 @@
 import {css, html, LitElement} from 'lit';
 import {customElement, property} from 'lit/decorators.js';
+import * as uuid from 'uuid';
 
 @customElement('design-wrapper')
 export class DesignWrapper extends LitElement {
@@ -60,6 +61,7 @@ export class DesignWrapper extends LitElement {
 
     connectedCallback() {
         super.connectedCallback();
+        this.id = uuid.v4();
         this.setAttribute('draggable', 'true');
         this.addEventListener('dragstart', this.onDragStart, {passive: false});
         this.addEventListener('drag', this.onDrag);
@@ -79,9 +81,12 @@ export class DesignWrapper extends LitElement {
 
     onDragStart(evt) {
         // evt.preventDefault()
-        evt.dataTransfer.effectAllowed = 'move'
-        evt.dataTransfer.setData('text/html', this.outerHTML)
-        console.log(evt.type, `${evt.target.localName} (${evt.target.textContent})`, evt)
+        if (evt.target === this) {
+            evt.dataTransfer.effectAllowed = 'move'
+            evt.dataTransfer.setData('text/html', this.outerHTML)
+           // evt.dataTransfer.setData('text/plain', evt.currentTarget.dataset.id);
+            console.log(evt.type, `${evt.target.localName} (${evt.target.textContent})`, evt)
+        }
     }
 
     // fires repeatedly while dragging
@@ -117,6 +122,14 @@ export class DesignWrapper extends LitElement {
         if (e.target === this) {
             this.isDragOver = false;
             console.log(`DROPPED - ${this.name}`);
+
+            // document.querySelector(`[data-id="${e.dataTransfer.getData('text/plain')}"]`).remove();
+            e.currentTarget.innerHTML = e.currentTarget.innerHTML + e.dataTransfer.getData('text/html');
+
+
+            // const draggedTask = document.getElementById("dragged-task");
+            // draggedTask.remove();
+            // column.children[1].appendChild(draggedTask);
         }
     }
 }
