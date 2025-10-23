@@ -83,8 +83,7 @@ export class DesignWrapper extends LitElement {
         // evt.preventDefault()
         if (evt.target === this) {
             evt.dataTransfer.effectAllowed = 'move'
-            evt.dataTransfer.setData('text/html', this.outerHTML)
-           // evt.dataTransfer.setData('text/plain', evt.currentTarget.dataset.id);
+            evt.dataTransfer.setData('text/plain', this.id);
             console.log(evt.type, `${evt.target.localName} (${evt.target.textContent})`, evt)
         }
     }
@@ -124,12 +123,25 @@ export class DesignWrapper extends LitElement {
             console.log(`DROPPED - ${this.name}`);
 
             // document.querySelector(`[data-id="${e.dataTransfer.getData('text/plain')}"]`).remove();
-            e.currentTarget.innerHTML = e.currentTarget.innerHTML + e.dataTransfer.getData('text/html');
+            // e.currentTarget.innerHTML = e.currentTarget.innerHTML + e.dataTransfer.getData('text/html');
+
+            const draggedItemId = e.dataTransfer.getData('text/plain');
+            const draggedTask = document.getElementById(draggedItemId);
+            draggedTask.remove();
+
+            this.appendChild(draggedTask);
 
 
-            // const draggedTask = document.getElementById("dragged-task");
-            // draggedTask.remove();
-            // column.children[1].appendChild(draggedTask);
+            // // Get the slot element from shadow DOM
+            // const slot = this.shadowRoot.querySelector('slot');
+            // const assignedElements = slot.assignedElements();
+            //
+            // // If there's a container element, append to it, otherwise append directly
+            // if (assignedElements.length > 0 && assignedElements[0].nodeType === Node.ELEMENT_NODE) {
+            //     assignedElements[0].appendChild(draggedTask);
+            // } else {
+            //     this.appendChild(draggedTask);
+            // }
         }
     }
 }
