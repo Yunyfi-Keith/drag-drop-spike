@@ -55,6 +55,7 @@ export class DesignWrapper extends LitElement {
             .placeholder {
                 border: 1px solid #cccccc;
                 border-radius: 3px;
+                list-style: none;
             }
             
             slot {

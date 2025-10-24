@@ -64,7 +64,7 @@ export class NativeDragDropController implements ReactiveController {
     };
 
     private _onDrag = (evt: DragEvent) => {
-        console.log(evt.type, `${(evt.target as HTMLElement).localName}`, evt);
+        // console.log(evt.type, `${(evt.target as HTMLElement).localName}`, evt);
     };
 
     private _onDragEnd = (evt: DragEvent) => {
@@ -84,14 +84,14 @@ export class NativeDragDropController implements ReactiveController {
 
         // ❌ If we're dragging over itself, we don't want to enter 'isDragOver' because we can't drop into itself.
         if (draggedElement === elementRaisingDragoverEvent) {
-            console.log(`case 1 - ${this._hostElement.name }`);
+          //  console.log(`case 1 - ${this._hostElement.name }`);
             e.stopPropagation(); // stop parents reacting
             return
         }
 
         // ❌ When dragging over a child, we don't want to enter 'isDragOver' because ultimately we can't drop a parent element into a child.
         if (draggedElement.contains(this._hostElement)) {
-            console.log(`case 2 - ${this._hostElement.name }`);
+          //  console.log(`case 2 - ${this._hostElement.name }`);
             e.stopPropagation(); // stop parents reacting
             return
         }
@@ -110,39 +110,76 @@ export class NativeDragDropController implements ReactiveController {
 
     private _onDragOverMoveDropPlaceholder(event: DragEvent) {
         const draggedElement = this._getDraggedElement();
-        const hostsFirstChild = this._hostElement.children[1];
-        const existingPlaceholder = this._hostElement.querySelector(".placeholder");
-        if (existingPlaceholder) {
-            const placeholderRect = existingPlaceholder.getBoundingClientRect();
-            let stillWithinPlaceholderBounds = placeholderRect.top <= event.clientY && placeholderRect.bottom >= event.clientY;
-            if (stillWithinPlaceholderBounds) {
-                return;
-            }
+        const hostsFirstChild = this._hostElement.shadowRoot.firstElementChild;
+
+        let hostElementBounds = this._hostElement.getBoundingClientRect();
+
+        // Calculate quadrant boundaries
+        const midX = hostElementBounds.left + hostElementBounds.width / 2;
+        const midY = hostElementBounds.top + hostElementBounds.height / 2;
+
+        // Determine which quadrant the cursor is in
+        const isLeft = event.clientX < midX;
+        const isUpper = event.clientY < midY;
+
+        let quadrant: string;
+        if (isUpper && isLeft) {
+            quadrant = 'upperLeft';
+        } else if (isUpper && !isLeft) {
+            quadrant = 'upperRight';
+        } else if (!isUpper && isLeft) {
+            quadrant = 'lowerLeft';
+        } else {
+            quadrant = 'lowerRight';
         }
-        for (const element of hostsFirstChild.children) {
-            if (element.getBoundingClientRect().bottom >= event.clientY) {
-                if (element === existingPlaceholder){
-                    return;
-                }
-                existingPlaceholder?.remove();
-                if (element === draggedElement || element.previousElementSibling === draggedElement){
-                    // I don't think is possible in my case as prior conditions excluded dragging over itself or a child.
-                    debugger
-                    return;
-                }
-                hostsFirstChild.insertBefore(
-                    existingPlaceholder ?? this._makePlaceholder(draggedElement),
-                    element,
-                );
-                return;
-            }
-        }
-        existingPlaceholder?.remove();
-        if (hostsFirstChild.lastElementChild === draggedElement) {
-            return;
-        }
-        hostsFirstChild.append(existingPlaceholder ?? this._makePlaceholder(draggedElement));
+
+        console.log(`Cursor at (${event.clientX}, ${event.clientY}) in quadrant: ${quadrant}`);
+
+        //
+        // hostElementBounds
+        //
+        // event.clientY
+        // for (const element of hostsFirstChild.children) {
+        //
+        // }
+        //
     }
+
+    // private _onDragOverMoveDropPlaceholder(event: DragEvent) {
+    //     const draggedElement = this._getDraggedElement();
+    //     const hostsFirstChild = this._hostElement.shadowRoot.firstElementChild;
+    //     const existingPlaceholder = this._hostElement.querySelector(".placeholder");
+    //     if (existingPlaceholder) {
+    //         const placeholderRect = existingPlaceholder.getBoundingClientRect();
+    //         let stillWithinPlaceholderBounds = placeholderRect.top <= event.clientY && placeholderRect.bottom >= event.clientY;
+    //         if (stillWithinPlaceholderBounds) {
+    //             return;
+    //         }
+    //     }
+    //     for (const element of hostsFirstChild.children) {
+    //         if (element.getBoundingClientRect().bottom >= event.clientY) {
+    //             if (element === existingPlaceholder){
+    //                 return;
+    //             }
+    //             existingPlaceholder?.remove();
+    //             if (element === draggedElement || element.previousElementSibling === draggedElement){
+    //                 // I don't think is possible in my case as prior conditions excluded dragging over itself or a child.
+    //                 debugger
+    //                 return;
+    //             }
+    //             hostsFirstChild.insertBefore(
+    //                 existingPlaceholder ?? this._makePlaceholder(draggedElement),
+    //                 element,
+    //             );
+    //             return;
+    //         }
+    //     }
+    //     existingPlaceholder?.remove();
+    //     if (hostsFirstChild.lastElementChild === draggedElement) {
+    //         return;
+    //     }
+    //     hostsFirstChild.append(existingPlaceholder ?? this._makePlaceholder(draggedElement));
+    // }
 
     private _makePlaceholder(draggedTask) {
         const placeholder = document.createElement("li");
