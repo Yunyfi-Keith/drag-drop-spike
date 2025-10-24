@@ -1,7 +1,7 @@
 import {css, html, LitElement} from 'lit';
 import {customElement, property} from 'lit/decorators.js';
+import {classMap} from 'lit/directives/class-map.js';
 import {NativeDragDropController} from './controllers/nativeDragDropController';
-import {InteractDragDropController} from './controllers/interactDragDropController';
 
 @customElement('design-wrapper')
 export class DesignWrapper extends LitElement {
@@ -28,6 +28,22 @@ export class DesignWrapper extends LitElement {
                 background: #a8a8a8;
             }
 
+            .design-wrapper.drop-top {
+                border-top: 3px solid #4CAF50;
+            }
+
+            .design-wrapper.drop-bottom {
+                border-bottom: 3px solid #4CAF50;
+            }
+
+            .design-wrapper.drop-left {
+                border-left: 3px solid #4CAF50;
+            }
+
+            .design-wrapper.drop-right {
+                border-right: 3px solid #4CAF50;
+            }
+            
             .design-wrapper::before {
                 content: '';
                 position: absolute;
@@ -51,12 +67,6 @@ export class DesignWrapper extends LitElement {
             .design-wrapper:hover::before {
                 opacity: 1;
             }
-
-            .placeholder {
-                border: 1px solid #cccccc;
-                border-radius: 3px;
-                list-style: none;
-            }
             
             slot {
 
@@ -67,8 +77,17 @@ export class DesignWrapper extends LitElement {
     accessor name: string = null;
 
     render() {
+        const quadrant = this.dragDropController.dropIndicatorQuadrant;
+        const classes = {
+            'design-wrapper': true,
+            'drag-over': this.dragDropController.isDragOver,
+            'drop-top': quadrant === 'upperLeft' || quadrant === 'upperRight',
+            'drop-bottom': quadrant === 'lowerLeft' || quadrant === 'lowerRight',
+            'drop-left': quadrant === 'upperLeft' || quadrant === 'lowerLeft',
+            'drop-right': quadrant === 'upperRight' || quadrant === 'lowerRight'
+        };
         return html`
-            <div class="design-wrapper ${this.dragDropController.isDragOver ? 'drag-over' : ''}">
+            <div class="${classMap(classes)}">
                 <slot></slot>
             </div>
         `;

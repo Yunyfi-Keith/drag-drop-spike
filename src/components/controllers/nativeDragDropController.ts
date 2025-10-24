@@ -18,6 +18,7 @@ enum Quadrant {
 export class NativeDragDropController implements ReactiveController {
     private readonly _hostElement: DragDropHost;
     private _isDragOver = false;
+    private _dropIndicatorQuadrant: Quadrant | null = null;
 
     constructor(host: DragDropHost) {
         this._hostElement = host;
@@ -26,6 +27,10 @@ export class NativeDragDropController implements ReactiveController {
 
     get isDragOver(): boolean {
         return this._isDragOver;
+    }
+
+    get dropIndicatorQuadrant(): Quadrant | null {
+        return this._dropIndicatorQuadrant;
     }
 
     hostConnected() {
@@ -109,51 +114,18 @@ export class NativeDragDropController implements ReactiveController {
         // Stop parent nodes also handling this, don't want multiple elements in 'drag over' state.
         e.stopPropagation();
         this._isDragOver = true;
-        this._onDragOverMoveDropPlaceholder(e)
+        this._onDragOverHighlightDropIndicatorBorder(e)
         this._hostElement.requestUpdate();
         console.log(`dragover - ${this._hostElement.name || 'unnamed'}`);
     };
 
 
-    private _onDragOverMoveDropPlaceholder(event: DragEvent) {
+    private _onDragOverHighlightDropIndicatorBorder(event: DragEvent) {
         const draggedElement = this._getDraggedElement();
-        // const hostsFirstChild = this._hostElement.shadowRoot.firstElementChild;
-        // let quadrant = this._getCursorQuadrant(event, this._hostElement);
-        // console.log(`Cursor at (${event.clientX}, ${event.clientY}) in quadrant: ${quadrant}`);
-
-        //
-        // hostElementBounds
-        //
-        // event.clientY
-        for (const ce of this._hostElement.shadowRoot.children) {
-            const childElement = ce as HTMLElement;
-            const childElementBounds = childElement.getBoundingClientRect();
-            const isInside =
-                event.clientX >= childElementBounds.left &&
-                event.clientX <= childElementBounds.right &&
-                event.clientY >= childElementBounds.top &&
-                event.clientY <= childElementBounds.bottom;
-            if (isInside) {
-                let childQuadrant = this._getCursorQuadrantRelativeToElementBounds(event, childElement);
-                console.log(`quadrant: ${childQuadrant} of ${childElement.localName} - ${event.clientX}, ${event.clientY} `);
-                const borderStyle = '2px solid blue'; // Customize as needed
-                // switch (childQuadrant) {
-                //     case Quadrant.UpperLeft:
-                //         childElement.style.borderLeft = borderStyle;
-                //         break;
-                //     case Quadrant.UpperRight:
-                //         childElement.style.borderTop = borderStyle;
-                //         break;
-                //     case Quadrant.LowerLeft:
-                //         childElement.style.borderBottom = borderStyle;
-                //         break;
-                //     case Quadrant.LowerRight:
-                //         childElement.style.borderRight = borderStyle;
-                //         break;
-                // }
-            }
-        }
-        //
+        const hostsFirstChild = this._hostElement.shadowRoot;
+        let quadrant = this._getCursorQuadrantRelativeToElementBounds(event, this._hostElement);
+        this._dropIndicatorQuadrant = quadrant;
+        console.log(`Cursor at (${event.clientX}, ${event.clientY}) in quadrant: ${quadrant}`);
     }
 
     private _getCursorQuadrantRelativeToElementBounds(event: DragEvent, relativeToElement: HTMLElement): Quadrant {
@@ -178,63 +150,8 @@ export class NativeDragDropController implements ReactiveController {
         }
     }
 
-// private _onDragOverMoveDropPlaceholder(event: DragEvent) {
-    //     const draggedElement = this._getDraggedElement();
-    //     const hostsFirstChild = this._hostElement.shadowRoot.firstElementChild;
-    //     const existingPlaceholder = this._hostElement.querySelector(".placeholder");
-    //     if (existingPlaceholder) {
-    //         const placeholderRect = existingPlaceholder.getBoundingClientRect();
-    //         let stillWithinPlaceholderBounds = placeholderRect.top <= event.clientY && placeholderRect.bottom >= event.clientY;
-    //         if (stillWithinPlaceholderBounds) {
-    //             return;
-    //         }
-    //     }
-    //     for (const element of hostsFirstChild.children) {
-    //         if (element.getBoundingClientRect().bottom >= event.clientY) {
-    //             if (element === existingPlaceholder){
-    //                 return;
-    //             }
-    //             existingPlaceholder?.remove();
-    //             if (element === draggedElement || element.previousElementSibling === draggedElement){
-    //                 // I don't think is possible in my case as prior conditions excluded dragging over itself or a child.
-    //                 debugger
-    //                 return;
-    //             }
-    //             hostsFirstChild.insertBefore(
-    //                 existingPlaceholder ?? this._makePlaceholder(draggedElement),
-    //                 element,
-    //             );
-    //             return;
-    //         }
-    //     }
-    //     existingPlaceholder?.remove();
-    //     if (hostsFirstChild.lastElementChild === draggedElement) {
-    //         return;
-    //     }
-    //     hostsFirstChild.append(existingPlaceholder ?? this._makePlaceholder(draggedElement));
-    // }
-
-    private _makePlaceholder(draggedTask) {
-        const placeholder = document.createElement("li");
-        placeholder.classList.add("placeholder");
-        placeholder.style.height = `${draggedTask.offsetHeight}px`;
-        return placeholder;
-    }
-
     private _onDragLeave = (e: DragEvent) => {
-        const target = e.target as HTMLElement;
-        const relatedTarget = e.relatedTarget as HTMLElement;
-
         this._tryEndDragState();
-
-        // // Only set isDragOver to false if we're leaving the host element entirely
-        // // (not just moving between child elements)
-        // if (target === element) { // } && (!relatedTarget || !element.contains(relatedTarget))) {
-        //     this._isDragOver = false;
-        //     const placeholder = element.querySelector(".placeholder");
-        //     placeholder?.remove();
-        //     this._hostElement.requestUpdate();
-        // }
     };
 
     private _onDrop = (e: DragEvent) => {
@@ -242,8 +159,6 @@ export class NativeDragDropController implements ReactiveController {
 
         const droppedOnElement = e.target as HTMLElement;
         let dropIsOnHostOrChild = this._hostElement === droppedOnElement || this._hostElement.contains(droppedOnElement);
-
-        console.log(`DROPPED BEFORE - ${this._hostElement.name || 'unnamed'}`);
 
         if (dropIsOnHostOrChild) {
 
@@ -258,8 +173,16 @@ export class NativeDragDropController implements ReactiveController {
                 console.warn('Cannot drop a parent into its own child');
                 return;
             }
+
             draggedElement.remove();
-            this._hostElement.appendChild(draggedElement);
+
+            const insertBefore = this._dropIndicatorQuadrant === Quadrant.UpperLeft || this._dropIndicatorQuadrant === Quadrant.LowerLeft
+
+            if (insertBefore) {
+                this._hostElement.insertBefore(draggedElement, this._hostElement.firstChild);
+            } else {
+                this._hostElement.appendChild(draggedElement);
+            }
         }
         this._tryEndDragState();
     };
@@ -267,8 +190,7 @@ export class NativeDragDropController implements ReactiveController {
     private _tryEndDragState() {
         if (this._isDragOver) {
             this._isDragOver = false;
-            const placeholder = this._hostElement.querySelector(".placeholder");
-            placeholder?.remove();
+            this._dropIndicatorQuadrant = null;
             this._hostElement.requestUpdate();
         }
     }
