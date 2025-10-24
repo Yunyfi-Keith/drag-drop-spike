@@ -9,7 +9,7 @@ export interface DragDropHost extends ReactiveControllerHost, HTMLElement {
 const DataDesignElementDraggingAttribute = 'data-design-element-dragging';
 
 export class NativeDragDropController implements ReactiveController {
-    private _hostElement: DragDropHost;
+    private readonly _hostElement: DragDropHost;
     private _isDragOver = false;
 
     constructor(host: DragDropHost) {
@@ -69,7 +69,7 @@ export class NativeDragDropController implements ReactiveController {
 
     private _onDragEnd = (evt: DragEvent) => {
         // Always fires, even for unsuccessful drops
-        this._hostElement.removeAttribute('data-dragging');
+        this._hostElement.removeAttribute(DataDesignElementDraggingAttribute);
     };
 
     /**
@@ -78,9 +78,7 @@ export class NativeDragDropController implements ReactiveController {
      */
     private _onDragOver = (e: DragEvent) => {
         const elementRaisingDragoverEvent = e.target as HTMLElement;
-        // Get the dragged element using a query, the e.dataTransfer.getData('text/plain') is 'protected', thus empty, when handing the dragover event.
-        // https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API/Drag_data_store#protected_mode
-        const draggedElement = document.querySelector(`[${DataDesignElementDraggingAttribute}="true"]`);
+        const draggedElement = this._getDraggedElement()
 
         // We need to ignore some cases:
 
@@ -104,7 +102,7 @@ export class NativeDragDropController implements ReactiveController {
         // Stop parent nodes also handling this, don't want multiple elements in 'drag over' state.
         e.stopPropagation();
         this._isDragOver = true;
-        this.movePlaceholder(e)
+        this.moveDropPlaceholder(e)
         this._hostElement.requestUpdate();
         console.log(`dragover - ${this._hostElement.name || 'unnamed'}`);
     };
@@ -128,39 +126,28 @@ export class NativeDragDropController implements ReactiveController {
     private _onDrop = (e: DragEvent) => {
         e.preventDefault();
 
-        const element = this._hostElement as unknown as HTMLElement;
-        const target = e.target as HTMLElement;
-        let dropIsOnHostOrChild = element === target || element.contains(target);
+        const droppedOnElement = e.target as HTMLElement;
+        let dropIsOnHostOrChild = this._hostElement === droppedOnElement || this._hostElement.contains(droppedOnElement);
 
         console.log(`DROPPED BEFORE - ${this._hostElement.name || 'unnamed'}`);
-
-
-
-
 
         if (dropIsOnHostOrChild) {
 
             e.stopPropagation()
 
-            this._isDragOver = false;
-            this._hostElement.requestUpdate();
             console.log(`DROPPED - ${this._hostElement.name || 'unnamed'}`);
-
 
             const draggedElement = this._getDraggedElement(e);
 
-            if (draggedElement) {
-                // Check if the drop target is the dragged element itself or a descendant
-                if (draggedElement === element || draggedElement.contains(element)) {
-                    console.warn('Cannot drop a parent into its own child');
-                    return;
-                }
-                draggedElement.remove();
-                element.appendChild(draggedElement);
-                const placeholder = element.querySelector(".placeholder");
-                placeholder?.remove();
+            // Check if the drop target is the dragged element itself or a descendant
+            if (draggedElement === this._hostElement || draggedElement.contains(this._hostElement)) {
+                console.warn('Cannot drop a parent into its own child');
+                return;
             }
+            draggedElement.remove();
+            this._hostElement.appendChild(draggedElement);
         }
+        this._tryEndDragState();
     };
 
     private _tryEndDragState() {
@@ -172,11 +159,23 @@ export class NativeDragDropController implements ReactiveController {
         }
     }
 
-    private _getDraggedElement(e: DragEvent) {
-        // You can only read from the data transfer store during dragStart and drop events:
+    private _getDraggedElement(): HTMLElement;
+    private _getDraggedElement(e: DragEvent) : HTMLElement;
+    private _getDraggedElement(...args: DragEvent[]): HTMLElement {
+        if (args.length > 0) {
+            const dragEvent = args[0];
+            if (dragEvent.type !== 'drop') {
+                throw new Error('This method is only supported during drop events');
+            }
+            // You can only read from the data transfer store during dragStart and drop events:
+            // https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API/Drag_data_store#protected_mode
+            const draggedItemId = dragEvent.dataTransfer.getData('text/plain');
+            return document.getElementById(draggedItemId);
+        }
+
+        // Get the dragged element using a query, the e.dataTransfer.getData('text/plain') is 'protected', thus empty, when handing the dragover event.
         // https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API/Drag_data_store#protected_mode
-        const draggedItemId = e.dataTransfer.getData('text/plain');
-        return document.getElementById(draggedItemId);
+        return document.querySelector(`[${DataDesignElementDraggingAttribute}="true"]`);
     }
 
     private makePlaceholder(draggedTask) {
@@ -185,7 +184,8 @@ export class NativeDragDropController implements ReactiveController {
         placeholder.style.height = `${draggedTask.offsetHeight}px`;
         return placeholder;
     }
-    private movePlaceholder(event) {
+
+    private moveDropPlaceholder(event) {
 
         return;
 
