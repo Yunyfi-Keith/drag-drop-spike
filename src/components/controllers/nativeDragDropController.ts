@@ -72,54 +72,57 @@ export class NativeDragDropController implements ReactiveController {
         this._hostElement.removeAttribute('data-dragging');
     };
 
+    /**
+     * This fires for all hosts using this controller, this may include child elements of the initiating host (nested elements).
+     * @param e
+     */
     private _onDragOver = (e: DragEvent) => {
-        // Call event.preventDefault(), which enables this to receive drop events.
-        // https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/dragover_event
-        e.preventDefault(); // Required to allow drop
-
-        // This fires for all hosts using this controller, this may include child elements of the initiating host (nested elements).
-
+        const elementRaisingDragoverEvent = e.target as HTMLElement;
         // Get the dragged element using a query, the e.dataTransfer.getData('text/plain') is 'protected', thus empty, when handing the dragover event.
         // https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API/Drag_data_store#protected_mode
         const draggedElement = document.querySelector(`[${DataDesignElementDraggingAttribute}="true"]`);
 
         // We need to ignore some cases:
 
-        // ✅ When dragging over a child, we don't want to enter 'isDragOver' because ultimately we can't drop a parent element into a child.
-        if (draggedElement.contains(this._hostElement)) {
-          //  e.stopPropagation();
+        // ❌ If we're dragging over itself, we don't want to enter 'isDragOver' because we can't drop into itself.
+        if (draggedElement === elementRaisingDragoverEvent) {
+            console.log(`case 1 - ${this._hostElement.name }`);
+            e.stopPropagation(); // stop parents reacting
             return
         }
 
-        // These nested elements may or may
-        // We need to process in both cases, so we can transition from parent to child during drag.
-        // For example, as we transition from parent to child, we don't want the original parent to revert its drag status,
-        // we want to carry on the drag while over the children.
-        //
-        // That said, when this callback starts firing for a child, we need to stopPropagation so both the child and the parent don't handle it.
-        const elementRaisingDragoverEvent = e.target as HTMLElement;
-        if (this._hostElement === elementRaisingDragoverEvent) { // } || this._hostElement.contains(elementRaisingEvent)) {
-            e.stopPropagation();
-            this._isDragOver = true;
-            this.movePlaceholder(e)
-            this._hostElement.requestUpdate();
-            console.log(`dragover - ${this._hostElement.name || 'unnamed'}`);
+        // ❌ When dragging over a child, we don't want to enter 'isDragOver' because ultimately we can't drop a parent element into a child.
+        if (draggedElement.contains(this._hostElement)) {
+            console.log(`case 2 - ${this._hostElement.name }`);
+            e.stopPropagation(); // stop parents reacting
+            return
         }
+
+        // Call event.preventDefault(), which enables this to receive drop events.
+        // https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/dragover_event
+        e.preventDefault();
+        // Stop parent nodes also handling this, don't want multiple elements in 'drag over' state.
+        e.stopPropagation();
+        this._isDragOver = true;
+        this.movePlaceholder(e)
+        this._hostElement.requestUpdate();
+        console.log(`dragover - ${this._hostElement.name || 'unnamed'}`);
     };
 
     private _onDragLeave = (e: DragEvent) => {
-        const element = this._hostElement as unknown as HTMLElement;
         const target = e.target as HTMLElement;
         const relatedTarget = e.relatedTarget as HTMLElement;
 
-        // Only set isDragOver to false if we're leaving the host element entirely
-        // (not just moving between child elements)
-        if (target === element) { // } && (!relatedTarget || !element.contains(relatedTarget))) {
-            this._isDragOver = false;
-            const placeholder = element.querySelector(".placeholder");
-            placeholder?.remove();
-            this._hostElement.requestUpdate();
-        }
+        this._tryEndDragState();
+
+        // // Only set isDragOver to false if we're leaving the host element entirely
+        // // (not just moving between child elements)
+        // if (target === element) { // } && (!relatedTarget || !element.contains(relatedTarget))) {
+        //     this._isDragOver = false;
+        //     const placeholder = element.querySelector(".placeholder");
+        //     placeholder?.remove();
+        //     this._hostElement.requestUpdate();
+        // }
     };
 
     private _onDrop = (e: DragEvent) => {
@@ -159,6 +162,15 @@ export class NativeDragDropController implements ReactiveController {
             }
         }
     };
+
+    private _tryEndDragState() {
+        if (this._isDragOver) {
+            this._isDragOver = false;
+            const placeholder = this._hostElement.querySelector(".placeholder");
+            placeholder?.remove();
+            this._hostElement.requestUpdate();
+        }
+    }
 
     private _getDraggedElement(e: DragEvent) {
         // You can only read from the data transfer store during dragStart and drop events:
