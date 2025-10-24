@@ -2,6 +2,7 @@ import {css, html, LitElement} from 'lit';
 import {customElement, property} from 'lit/decorators.js';
 import {classMap} from 'lit/directives/class-map.js';
 import {NativeDragDropController} from './controllers/nativeDragDropController';
+import {Quadrant} from './controllers/quadrant';
 
 @customElement('design-wrapper')
 export class DesignWrapper extends LitElement {
@@ -79,11 +80,14 @@ export class DesignWrapper extends LitElement {
     @property({attribute: true})
     accessor supportsDrop: boolean = false;
 
+    @property({attribute: true})
+    accessor highlightQuadrant: Quadrant = null;
+
     render() {
-        const quadrant = this.dragDropController.dropIndicatorQuadrant;
+        const quadrant = this.highlightQuadrant;
         const classes = {
             'design-wrapper': true,
-            'drag-over': this.dragDropController.isDragOver,
+            'drag-over': this.highlightQuadrant,
             'drop-top': quadrant === 'upperLeft' || quadrant === 'upperRight',
             'drop-bottom': quadrant === 'lowerLeft' || quadrant === 'lowerRight',
             'drop-left': quadrant === 'upperLeft' || quadrant === 'lowerLeft',

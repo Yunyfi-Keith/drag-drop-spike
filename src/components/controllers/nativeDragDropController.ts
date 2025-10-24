@@ -1,5 +1,6 @@
 import {ReactiveController, ReactiveControllerHost} from 'lit';
 import * as uuid from 'uuid';
+import {Quadrant} from './quadrant';
 
 export interface DragDropHost extends ReactiveControllerHost, HTMLElement {
     id: string;
@@ -9,17 +10,9 @@ export interface DragDropHost extends ReactiveControllerHost, HTMLElement {
 
 const DataDesignElementDraggingAttribute = 'data-design-element-dragging';
 
-enum Quadrant {
-    UpperLeft = 'upperLeft',
-    UpperRight = 'upperRight',
-    LowerLeft = 'lowerLeft',
-    LowerRight = 'lowerRight'
-}
-
 export class NativeDragDropController implements ReactiveController {
     private readonly _hostElement: DragDropHost;
     private _isDragOver = false;
-    private _dropIndicatorQuadrant: Quadrant | null = null;
     private _supportsDrop: boolean = false;
 
     constructor(host: DragDropHost) {
@@ -29,10 +22,6 @@ export class NativeDragDropController implements ReactiveController {
 
     get isDragOver(): boolean {
         return this._isDragOver;
-    }
-
-    get dropIndicatorQuadrant(): Quadrant | null {
-        return this._dropIndicatorQuadrant;
     }
 
     hostConnected() {
@@ -130,9 +119,61 @@ export class NativeDragDropController implements ReactiveController {
     private _onDragOverHighlightDropIndicatorBorder(event: DragEvent) {
         const draggedElement = this._getDraggedElement();
         const hostsFirstChild = this._hostElement.shadowRoot;
-        let quadrant = this._getCursorQuadrantRelativeToElementBounds(event, this._hostElement);
-        this._dropIndicatorQuadrant = quadrant;
-        console.log(`Cursor at (${event.clientX}, ${event.clientY}) in quadrant: ${quadrant}`);
+        // let quadrant = this._getCursorQuadrantRelativeToElementBounds(event, this._hostElement);
+        // this._dropIndicatorQuadrant = quadrant;
+        // console.log(`Cursor at (${event.clientX}, ${event.clientY}) in quadrant: ${quadrant}`);
+
+        // Find all first-level design-wrappers in each branch
+        const designWrappers = this.findFirstDesignWrappersInEachBranch(this._hostElement);
+
+        for (const wrapper of designWrappers) {
+            const bounds = wrapper.getBoundingClientRect();
+            const isInside =
+                event.clientX >= bounds.left &&
+                event.clientX <= bounds.right &&
+                event.clientY >= bounds.top &&
+                event.clientY <= bounds.bottom;
+            if (isInside) {
+                let quadrant = this._getCursorQuadrantRelativeToElementBounds(event, wrapper);
+                console.log(`quadrant: ${quadrant} of ${wrapper.localName} - ${event.clientX}, ${event.clientY} `);
+                // If the wrapper is a DesignWrapper component, set its highlightQuadrant property
+                if ('highlightQuadrant' in wrapper) {
+                    (wrapper as any).highlightQuadrant = quadrant;
+                }
+                // Only highlight the first match (the one closest to the user)
+                break;
+            } else {
+                (wrapper as any).highlightQuadrant = null;
+            }
+        }
+
+    }
+
+    // private getSlottedDesignWrappers(): HTMLElement[] {
+    //     const slot = this._hostElement.shadowRoot?.querySelector('slot');
+    //     if (!slot) return [];
+    //
+    //     const assignedElements = slot.assignedElements({flatten: true});
+    //     return assignedElements.filter(el => el.tagName.toLowerCase() === 'design-wrapper') as HTMLElement[];
+    // }
+    //
+    private findFirstDesignWrappersInEachBranch(root: Element): HTMLElement[] {
+        const designWrappers: HTMLElement[] = [];
+
+        const children = Array.from(root.children);
+
+        for (const child of children) {
+            if (child.tagName.toLowerCase() === 'design-wrapper') {
+                // Found a design-wrapper, add it but don't traverse deeper in this branch
+                designWrappers.push(child as HTMLElement);
+            } else {
+                // Not a design-wrapper, recursively search its children
+                const nestedWrappers = this.findFirstDesignWrappersInEachBranch(child as HTMLElement);
+                designWrappers.push(...nestedWrappers);
+            }
+        }
+
+        return designWrappers;
     }
 
     private _getCursorQuadrantRelativeToElementBounds(event: DragEvent, relativeToElement: HTMLElement): Quadrant {
