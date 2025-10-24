@@ -9,6 +9,7 @@
     <script type="module" src="src/app.ts"></script>
 </head>
 <body>
+
 <container-page title="Page 1">
     <design-wrapper name="wrapper-div-1">
         <container-div>
@@ -21,6 +22,22 @@
         </container-div>
     </design-wrapper>
     <design-wrapper name="wrapper-div-2">
+        <container-div class="wa-grid">
+            <design-wrapper name="wrapper-user-name">
+                <input-text label="Box1" value="Box1"></input-text>
+            </design-wrapper>
+            <design-wrapper name="wrapper-password">
+                <input-text label="Box2" value="Box2"></input-text>
+            </design-wrapper>
+            <design-wrapper name="wrapper-user-name">
+                <input-text label="Box3" value="Box3"></input-text>
+            </design-wrapper>
+            <design-wrapper name="wrapper-password">
+                <input-text label="Box4" value="Box4"></input-text>
+            </design-wrapper>
+        </container-div>
+    </design-wrapper>
+    <design-wrapper name="wrapper-div-3">
         <design-wrapper name="wrapper-comments">
             <input-text label="Comments" value="Type here"></input-text>
         </design-wrapper>
