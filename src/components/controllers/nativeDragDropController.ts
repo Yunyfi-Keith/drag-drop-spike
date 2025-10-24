@@ -102,10 +102,54 @@ export class NativeDragDropController implements ReactiveController {
         // Stop parent nodes also handling this, don't want multiple elements in 'drag over' state.
         e.stopPropagation();
         this._isDragOver = true;
-        this.moveDropPlaceholder(e)
+        this._onDragOverMoveDropPlaceholder(e)
         this._hostElement.requestUpdate();
         console.log(`dragover - ${this._hostElement.name || 'unnamed'}`);
     };
+
+
+    private _onDragOverMoveDropPlaceholder(event: DragEvent) {
+        const draggedElement = this._getDraggedElement();
+        const hostsFirstChild = this._hostElement.children[1];
+        const existingPlaceholder = this._hostElement.querySelector(".placeholder");
+        if (existingPlaceholder) {
+            const placeholderRect = existingPlaceholder.getBoundingClientRect();
+            let stillWithinPlaceholderBounds = placeholderRect.top <= event.clientY && placeholderRect.bottom >= event.clientY;
+            if (stillWithinPlaceholderBounds) {
+                return;
+            }
+        }
+        for (const element of hostsFirstChild.children) {
+            if (element.getBoundingClientRect().bottom >= event.clientY) {
+                if (element === existingPlaceholder){
+                    return;
+                }
+                existingPlaceholder?.remove();
+                if (element === draggedElement || element.previousElementSibling === draggedElement){
+                    // I don't think is possible in my case as prior conditions excluded dragging over itself or a child.
+                    debugger
+                    return;
+                }
+                hostsFirstChild.insertBefore(
+                    existingPlaceholder ?? this._makePlaceholder(draggedElement),
+                    element,
+                );
+                return;
+            }
+        }
+        existingPlaceholder?.remove();
+        if (hostsFirstChild.lastElementChild === draggedElement) {
+            return;
+        }
+        hostsFirstChild.append(existingPlaceholder ?? this._makePlaceholder(draggedElement));
+    }
+
+    private _makePlaceholder(draggedTask) {
+        const placeholder = document.createElement("li");
+        placeholder.classList.add("placeholder");
+        placeholder.style.height = `${draggedTask.offsetHeight}px`;
+        return placeholder;
+    }
 
     private _onDragLeave = (e: DragEvent) => {
         const target = e.target as HTMLElement;
@@ -176,48 +220,5 @@ export class NativeDragDropController implements ReactiveController {
         // Get the dragged element using a query, the e.dataTransfer.getData('text/plain') is 'protected', thus empty, when handing the dragover event.
         // https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API/Drag_data_store#protected_mode
         return document.querySelector(`[${DataDesignElementDraggingAttribute}="true"]`);
-    }
-
-    private makePlaceholder(draggedTask) {
-        const placeholder = document.createElement("li");
-        placeholder.classList.add("placeholder");
-        placeholder.style.height = `${draggedTask.offsetHeight}px`;
-        return placeholder;
-    }
-
-    private moveDropPlaceholder(event) {
-
-        return;
-
-
-        const column = event.currentTarget;
-        const draggedTask = document.getElementById("dragged-task");
-        const tasks = column.children[1];
-        const existingPlaceholder = column.querySelector(".placeholder");
-        if (existingPlaceholder) {
-            const placeholderRect = existingPlaceholder.getBoundingClientRect();
-            if (
-                placeholderRect.top <= event.clientY &&
-                placeholderRect.bottom >= event.clientY
-            ) {
-                return;
-            }
-        }
-        for (const task of tasks.children) {
-            if (task.getBoundingClientRect().bottom >= event.clientY) {
-                if (task === existingPlaceholder) return;
-                existingPlaceholder?.remove();
-                if (task === draggedTask || task.previousElementSibling === draggedTask)
-                    return;
-                tasks.insertBefore(
-                    existingPlaceholder ?? this.makePlaceholder(draggedTask),
-                    task,
-                );
-                return;
-            }
-        }
-        existingPlaceholder?.remove();
-        if (tasks.lastElementChild === draggedTask) return;
-        tasks.append(existingPlaceholder ?? this.makePlaceholder(draggedTask));
     }
 }
