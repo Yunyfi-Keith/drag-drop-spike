@@ -1,18 +1,19 @@
-
 import {ReactiveController, ReactiveControllerHost} from 'lit';
 import * as uuid from 'uuid';
 
-export interface DragDropHost extends ReactiveControllerHost {
+export interface DragDropHost extends ReactiveControllerHost, HTMLElement {
     id: string;
     name?: string;
 }
 
+const DataDesignElementDraggingAttribute = 'data-design-element-dragging';
+
 export class NativeDragDropController implements ReactiveController {
-    private host: DragDropHost;
+    private _hostElement: DragDropHost;
     private _isDragOver = false;
 
     constructor(host: DragDropHost) {
-        this.host = host;
+        this._hostElement = host;
         host.addController(this);
     }
 
@@ -22,119 +23,189 @@ export class NativeDragDropController implements ReactiveController {
 
     hostConnected() {
         // Generate UUID if not already set
-        if (!this.host.id) {
-            this.host.id = uuid.v4();
+        // TODO this is a smell
+        if (!this._hostElement.id) {
+            this._hostElement.id = uuid.v4();
         }
 
-        const element = this.host as unknown as HTMLElement;
-        element.setAttribute('draggable', 'true');
+        this._hostElement.setAttribute('draggable', 'true');
 
         // Add event listeners
-        element.addEventListener('dragstart', this.onDragStart, {passive: false});
-        element.addEventListener('drag', this.onDrag);
-        element.addEventListener('dragend', this.onDragEnd);
-        element.addEventListener('dragover', this.onDragOver);
-        element.addEventListener('dragleave', this.onDragLeave);
-        element.addEventListener('drop', this.onDrop);
+        this._hostElement.addEventListener('dragstart', this._onDragStart, {passive: false});
+        this._hostElement.addEventListener('drag', this._onDrag);
+        this._hostElement.addEventListener('dragend', this._onDragEnd);
+        this._hostElement.addEventListener('dragover', this._onDragOver);
+        this._hostElement.addEventListener('dragleave', this._onDragLeave);
+        this._hostElement.addEventListener('drop', this._onDrop);
     }
 
     hostDisconnected() {
-        const element = this.host as unknown as HTMLElement;
+        const element = this._hostElement as unknown as HTMLElement;
 
         // Remove event listeners
-        element.removeEventListener('dragstart', this.onDragStart);
-        element.removeEventListener('drag', this.onDrag);
-        element.removeEventListener('dragend', this.onDragEnd);
-        element.removeEventListener('dragover', this.onDragOver);
-        element.removeEventListener('dragleave', this.onDragLeave);
-        element.removeEventListener('drop', this.onDrop);
+        element.removeEventListener('dragstart', this._onDragStart);
+        element.removeEventListener('drag', this._onDrag);
+        element.removeEventListener('dragend', this._onDragEnd);
+        element.removeEventListener('dragover', this._onDragOver);
+        element.removeEventListener('dragleave', this._onDragLeave);
+        element.removeEventListener('drop', this._onDrop);
     }
 
-    private onDragStart = (evt: DragEvent) => {
-        const element = this.host as unknown as HTMLElement;
-        if (evt.target === element) {
+    private _onDragStart = (evt: DragEvent) => {
+        // This fires for all hosts using this controller.
+        // ✅ Only kick off the logic for the instance that is being dragged
+        if (this._hostElement === evt.target) {
+            // Set a data attribute on the host so we can find the things being dragged during 'dropover' event handling.
+            this._hostElement.setAttribute(DataDesignElementDraggingAttribute, 'true');
             evt.dataTransfer.effectAllowed = 'move';
-            evt.dataTransfer.setData('text/plain', this.host.id);
+            evt.dataTransfer.setData('text/plain', this._hostElement.id);
             console.log(evt.type, `${(evt.target as HTMLElement).localName}`, evt);
         }
     };
 
-    private onDrag = (evt: DragEvent) => {
+    private _onDrag = (evt: DragEvent) => {
         console.log(evt.type, `${(evt.target as HTMLElement).localName}`, evt);
     };
 
-    private onDragEnd = (evt: DragEvent) => {
+    private _onDragEnd = (evt: DragEvent) => {
         // Always fires, even for unsuccessful drops
+        this._hostElement.removeAttribute('data-dragging');
     };
 
-    private onDragOver = (e: DragEvent) => {
+    private _onDragOver = (e: DragEvent) => {
+        // Call event.preventDefault(), which enables this to receive drop events.
+        // https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/dragover_event
         e.preventDefault(); // Required to allow drop
 
-        const element = this.host as unknown as HTMLElement;
-        const target = e.target as HTMLElement;
-        let dragIsOnHostOrChild = element === target || element.contains(target);
-        if (dragIsOnHostOrChild) {
+        // This fires for all hosts using this controller, this may include child elements of the initiating host (nested elements).
+
+        // Get the dragged element using a query, the e.dataTransfer.getData('text/plain') is 'protected', thus empty, when handing the dragover event.
+        // https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API/Drag_data_store#protected_mode
+        const draggedElement = document.querySelector(`[${DataDesignElementDraggingAttribute}="true"]`);
+
+        // We need to ignore some cases:
+
+        // ✅ When dragging over a child, we don't want to enter 'isDragOver' because ultimately we can't drop a parent element into a child.
+        if (draggedElement.contains(this._hostElement)) {
+          //  e.stopPropagation();
+            return
+        }
+
+        // These nested elements may or may
+        // We need to process in both cases, so we can transition from parent to child during drag.
+        // For example, as we transition from parent to child, we don't want the original parent to revert its drag status,
+        // we want to carry on the drag while over the children.
+        //
+        // That said, when this callback starts firing for a child, we need to stopPropagation so both the child and the parent don't handle it.
+        const elementRaisingDragoverEvent = e.target as HTMLElement;
+        if (this._hostElement === elementRaisingDragoverEvent) { // } || this._hostElement.contains(elementRaisingEvent)) {
             e.stopPropagation();
             this._isDragOver = true;
-            this.host.requestUpdate();
-            console.log(`dragover - ${this.host.name || 'unnamed'}`);
+            this.movePlaceholder(e)
+            this._hostElement.requestUpdate();
+            console.log(`dragover - ${this._hostElement.name || 'unnamed'}`);
         }
     };
 
-    private onDragLeave = (e: DragEvent) => {
-        const element = this.host as unknown as HTMLElement;
+    private _onDragLeave = (e: DragEvent) => {
+        const element = this._hostElement as unknown as HTMLElement;
         const target = e.target as HTMLElement;
         const relatedTarget = e.relatedTarget as HTMLElement;
 
         // Only set isDragOver to false if we're leaving the host element entirely
         // (not just moving between child elements)
-        if (target === element && (!relatedTarget || !element.contains(relatedTarget))) {
+        if (target === element) { // } && (!relatedTarget || !element.contains(relatedTarget))) {
             this._isDragOver = false;
-            this.host.requestUpdate();
+            const placeholder = element.querySelector(".placeholder");
+            placeholder?.remove();
+            this._hostElement.requestUpdate();
         }
     };
 
-    private onDrop = (e: DragEvent) => {
+    private _onDrop = (e: DragEvent) => {
         e.preventDefault();
 
-        const element = this.host as unknown as HTMLElement;
+        const element = this._hostElement as unknown as HTMLElement;
         const target = e.target as HTMLElement;
         let dropIsOnHostOrChild = element === target || element.contains(target);
 
-        console.log(`DROPPED BEFORE - ${this.host.name || 'unnamed'}`);
+        console.log(`DROPPED BEFORE - ${this._hostElement.name || 'unnamed'}`);
+
+
+
+
 
         if (dropIsOnHostOrChild) {
 
             e.stopPropagation()
 
             this._isDragOver = false;
-            this.host.requestUpdate();
-            console.log(`DROPPED - ${this.host.name || 'unnamed'}`);
+            this._hostElement.requestUpdate();
+            console.log(`DROPPED - ${this._hostElement.name || 'unnamed'}`);
 
-            const draggedItemId = e.dataTransfer.getData('text/plain');
-            const draggedTask = document.getElementById(draggedItemId);
 
-            if (draggedTask) {
+            const draggedElement = this._getDraggedElement(e);
+
+            if (draggedElement) {
                 // Check if the drop target is the dragged element itself or a descendant
-                if (draggedTask === element || draggedTask.contains(element)) {
+                if (draggedElement === element || draggedElement.contains(element)) {
                     console.warn('Cannot drop a parent into its own child');
                     return;
                 }
-                draggedTask.remove();
-                element.appendChild(draggedTask);
+                draggedElement.remove();
+                element.appendChild(draggedElement);
+                const placeholder = element.querySelector(".placeholder");
+                placeholder?.remove();
             }
-
-
-            // // Get the slot element from shadow DOM
-            // const slot = this.shadowRoot.querySelector('slot');
-            // const assignedElements = slot.assignedElements();
-            //
-            // // If there's a container element, append to it, otherwise append directly
-            // if (assignedElements.length > 0 && assignedElements[0].nodeType === Node.ELEMENT_NODE) {
-            //     assignedElements[0].appendChild(draggedTask);
-            // } else {
-            //     this.appendChild(draggedTask);
-            // }
         }
     };
+
+    private _getDraggedElement(e: DragEvent) {
+        // You can only read from the data transfer store during dragStart and drop events:
+        // https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API/Drag_data_store#protected_mode
+        const draggedItemId = e.dataTransfer.getData('text/plain');
+        return document.getElementById(draggedItemId);
+    }
+
+    private makePlaceholder(draggedTask) {
+        const placeholder = document.createElement("li");
+        placeholder.classList.add("placeholder");
+        placeholder.style.height = `${draggedTask.offsetHeight}px`;
+        return placeholder;
+    }
+    private movePlaceholder(event) {
+
+        return;
+
+
+        const column = event.currentTarget;
+        const draggedTask = document.getElementById("dragged-task");
+        const tasks = column.children[1];
+        const existingPlaceholder = column.querySelector(".placeholder");
+        if (existingPlaceholder) {
+            const placeholderRect = existingPlaceholder.getBoundingClientRect();
+            if (
+                placeholderRect.top <= event.clientY &&
+                placeholderRect.bottom >= event.clientY
+            ) {
+                return;
+            }
+        }
+        for (const task of tasks.children) {
+            if (task.getBoundingClientRect().bottom >= event.clientY) {
+                if (task === existingPlaceholder) return;
+                existingPlaceholder?.remove();
+                if (task === draggedTask || task.previousElementSibling === draggedTask)
+                    return;
+                tasks.insertBefore(
+                    existingPlaceholder ?? this.makePlaceholder(draggedTask),
+                    task,
+                );
+                return;
+            }
+        }
+        existingPlaceholder?.remove();
+        if (tasks.lastElementChild === draggedTask) return;
+        tasks.append(existingPlaceholder ?? this.makePlaceholder(draggedTask));
+    }
 }
