@@ -4,6 +4,7 @@ import * as uuid from 'uuid';
 export interface DragDropHost extends ReactiveControllerHost, HTMLElement {
     id: string;
     name?: string;
+    supportsDrop: boolean;
 }
 
 const DataDesignElementDraggingAttribute = 'data-design-element-dragging';
@@ -19,6 +20,7 @@ export class NativeDragDropController implements ReactiveController {
     private readonly _hostElement: DragDropHost;
     private _isDragOver = false;
     private _dropIndicatorQuadrant: Quadrant | null = null;
+    private _supportsDrop: boolean = false;
 
     constructor(host: DragDropHost) {
         this._hostElement = host;
@@ -34,6 +36,8 @@ export class NativeDragDropController implements ReactiveController {
     }
 
     hostConnected() {
+        this._supportsDrop = this._hostElement.supportsDrop;
+
         // Generate UUID if not already set
         // TODO this is a smell
         if (!this._hostElement.id) {
@@ -46,9 +50,12 @@ export class NativeDragDropController implements ReactiveController {
         this._hostElement.addEventListener('dragstart', this._onDragStart, {passive: false});
         this._hostElement.addEventListener('drag', this._onDrag);
         this._hostElement.addEventListener('dragend', this._onDragEnd);
-        this._hostElement.addEventListener('dragover', this._onDragOver);
-        this._hostElement.addEventListener('dragleave', this._onDragLeave);
-        this._hostElement.addEventListener('drop', this._onDrop);
+
+        if (this._supportsDrop) {
+            this._hostElement.addEventListener('dragover', this._onDragOver);
+            this._hostElement.addEventListener('dragleave', this._onDragLeave);
+            this._hostElement.addEventListener('drop', this._onDrop);
+        }
     }
 
     hostDisconnected() {

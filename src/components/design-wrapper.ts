@@ -76,6 +76,9 @@ export class DesignWrapper extends LitElement {
     @property({attribute: true})
     accessor name: string = null;
 
+    @property({attribute: true})
+    accessor supportsDrop: boolean = false;
+
     render() {
         const quadrant = this.dragDropController.dropIndicatorQuadrant;
         const classes = {

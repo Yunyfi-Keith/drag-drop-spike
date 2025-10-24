@@ -11,7 +11,7 @@
 <body>
 
 <container-page title="Page 1">
-    <design-wrapper name="wrapper-div-1">
+    <design-wrapper name="wrapper-div-1" supportsDrop="true">
         <container-div>
             <design-wrapper name="wrapper-user-name">
                 <input-text label="User Name" value="Keith"></input-text>
@@ -21,7 +21,7 @@
             </design-wrapper>
         </container-div>
     </design-wrapper>
-    <design-wrapper name="wrapper-div-2">
+    <design-wrapper name="wrapper-div-2" supportsDrop="true">
         <container-div class="wa-grid">
             <design-wrapper name="wrapper-user-name">
                 <input-text label="Box1" value="Box1"></input-text>
@@ -35,9 +35,26 @@
             <design-wrapper name="wrapper-password">
                 <input-text label="Box4" value="Box4"></input-text>
             </design-wrapper>
+
+            <design-wrapper name="wrapper-nested" supportsDrop="true">
+                <container-div>
+                    <design-wrapper name="nested-1">
+                        <input-text label="Nested1" value="Nested1"></input-text>
+                    </design-wrapper>
+                    <design-wrapper name="nested-2">
+                        <input-text label="Nested1" value="Nested2"></input-text>
+                    </design-wrapper>
+                    <design-wrapper name="nested-3">
+                        <input-text label="Nested1" value="Nested3"></input-text>
+                    </design-wrapper>
+                </container-div>
+            </design-wrapper>
+
+
+
         </container-div>
     </design-wrapper>
-    <design-wrapper name="wrapper-div-3">
+    <design-wrapper name="wrapper-div-3" supportsDrop="true">
         <design-wrapper name="wrapper-comments">
             <input-text label="Comments" value="Type here"></input-text>
         </design-wrapper>
