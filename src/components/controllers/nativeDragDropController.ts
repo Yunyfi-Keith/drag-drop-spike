@@ -8,6 +8,13 @@ export interface DragDropHost extends ReactiveControllerHost, HTMLElement {
 
 const DataDesignElementDraggingAttribute = 'data-design-element-dragging';
 
+enum Quadrant {
+    UpperLeft = 'upperLeft',
+    UpperRight = 'upperRight',
+    LowerLeft = 'lowerLeft',
+    LowerRight = 'lowerRight'
+}
+
 export class NativeDragDropController implements ReactiveController {
     private readonly _hostElement: DragDropHost;
     private _isDragOver = false;
@@ -110,9 +117,47 @@ export class NativeDragDropController implements ReactiveController {
 
     private _onDragOverMoveDropPlaceholder(event: DragEvent) {
         const draggedElement = this._getDraggedElement();
-        const hostsFirstChild = this._hostElement.shadowRoot.firstElementChild;
+        // const hostsFirstChild = this._hostElement.shadowRoot.firstElementChild;
+        // let quadrant = this._getCursorQuadrant(event, this._hostElement);
+        // console.log(`Cursor at (${event.clientX}, ${event.clientY}) in quadrant: ${quadrant}`);
 
-        let hostElementBounds = this._hostElement.getBoundingClientRect();
+        //
+        // hostElementBounds
+        //
+        // event.clientY
+        for (const ce of this._hostElement.shadowRoot.children) {
+            const childElement = ce as HTMLElement;
+            const childElementBounds = childElement.getBoundingClientRect();
+            const isInside =
+                event.clientX >= childElementBounds.left &&
+                event.clientX <= childElementBounds.right &&
+                event.clientY >= childElementBounds.top &&
+                event.clientY <= childElementBounds.bottom;
+            if (isInside) {
+                let childQuadrant = this._getCursorQuadrantRelativeToElementBounds(event, childElement);
+                console.log(`quadrant: ${childQuadrant} of ${childElement.localName} - ${event.clientX}, ${event.clientY} `);
+                const borderStyle = '2px solid blue'; // Customize as needed
+                // switch (childQuadrant) {
+                //     case Quadrant.UpperLeft:
+                //         childElement.style.borderLeft = borderStyle;
+                //         break;
+                //     case Quadrant.UpperRight:
+                //         childElement.style.borderTop = borderStyle;
+                //         break;
+                //     case Quadrant.LowerLeft:
+                //         childElement.style.borderBottom = borderStyle;
+                //         break;
+                //     case Quadrant.LowerRight:
+                //         childElement.style.borderRight = borderStyle;
+                //         break;
+                // }
+            }
+        }
+        //
+    }
+
+    private _getCursorQuadrantRelativeToElementBounds(event: DragEvent, relativeToElement: HTMLElement): Quadrant {
+        let hostElementBounds = relativeToElement.getBoundingClientRect();
 
         // Calculate quadrant boundaries
         const midX = hostElementBounds.left + hostElementBounds.width / 2;
@@ -122,30 +167,18 @@ export class NativeDragDropController implements ReactiveController {
         const isLeft = event.clientX < midX;
         const isUpper = event.clientY < midY;
 
-        let quadrant: string;
         if (isUpper && isLeft) {
-            quadrant = 'upperLeft';
+            return Quadrant.UpperLeft;
         } else if (isUpper && !isLeft) {
-            quadrant = 'upperRight';
+            return Quadrant.UpperRight;
         } else if (!isUpper && isLeft) {
-            quadrant = 'lowerLeft';
+            return Quadrant.LowerLeft;
         } else {
-            quadrant = 'lowerRight';
+            return Quadrant.LowerRight;
         }
-
-        console.log(`Cursor at (${event.clientX}, ${event.clientY}) in quadrant: ${quadrant}`);
-
-        //
-        // hostElementBounds
-        //
-        // event.clientY
-        // for (const element of hostsFirstChild.children) {
-        //
-        // }
-        //
     }
 
-    // private _onDragOverMoveDropPlaceholder(event: DragEvent) {
+// private _onDragOverMoveDropPlaceholder(event: DragEvent) {
     //     const draggedElement = this._getDraggedElement();
     //     const hostsFirstChild = this._hostElement.shadowRoot.firstElementChild;
     //     const existingPlaceholder = this._hostElement.querySelector(".placeholder");
